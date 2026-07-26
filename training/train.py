@@ -10,6 +10,13 @@ from data.generator import ChestXrayGenerator
 from models.model import build_full_model
 from training.losses import combined_seg_loss, weighted_focal_loss
 
+gpus = tf.config.list_physical_devices('GPU')
+if len(gpus) > 1:
+    strategy = tf.distribute.MirroredStrategy()
+    print(f"Training on {len(gpus)} GPUs using MirroredStrategy")
+else:
+    strategy = tf.distribute.get_strategy()
+
 # ---- Step 1: Set up paths (Kaggle) ----
 BASE = '/kaggle/input/datasets/organizations/nih-chest-xrays/data'
 
@@ -46,20 +53,21 @@ train_gen = ChestXrayGenerator(train_df, path_lookup, bbox_lookup, augment=True)
 val_gen   = ChestXrayGenerator(val_df,   path_lookup, bbox_lookup, augment=False)
 
 # ---- Step 8: Build and compile model ----
-model = build_full_model(encoder_trainable=False)
+with strategy.scope():
+    model = build_full_model(encoder_trainable=False)
 
-model.compile(
-    optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
-    loss={
-        'seg_output':   combined_seg_loss,
-        'deep_sup_112': combined_seg_loss,
-        'deep_sup_56':  combined_seg_loss,
-        'cls_output':   weighted_focal_loss(pos_weights_tensor)
-    },
-    loss_weights={
-        'seg_output':   0.5,
-        'deep_sup_112': 0.3,
-        'deep_sup_56':  0.2,
-        'cls_output':   1.0
-    }
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+        loss={
+            'seg_output':   combined_seg_loss,
+            'deep_sup_112': combined_seg_loss,
+            'deep_sup_56':  combined_seg_loss,
+            'cls_output':   weighted_focal_loss(pos_weights_tensor)
+        },
+        loss_weights={
+            'seg_output':   0.5,
+            'deep_sup_112': 0.3,
+            'deep_sup_56':  0.2,
+            'cls_output':   1.0
+        }
 )
