@@ -71,3 +71,39 @@ with strategy.scope():
             'cls_output':   1.0
         }
 )
+    
+# ---- Step 9: Callbacks ----
+callbacks = [
+    tf.keras.callbacks.ModelCheckpoint(
+        'stage1_best.keras',
+        monitor='val_seg_output_loss',
+        save_best_only=True,
+        mode='min',
+        verbose=1
+    ),
+    tf.keras.callbacks.ReduceLROnPlateau(
+        monitor='val_seg_output_loss',
+        factor=0.5,
+        patience=2,
+        mode='min',
+        verbose=1
+    ),
+    tf.keras.callbacks.EarlyStopping(
+        monitor='val_seg_output_loss',
+        patience=5,
+        mode='min',
+        restore_best_weights=True,
+        verbose=1
+    )
+]
+
+# ---- Step 10: Train — Stage 1, frozen encoder ----
+history = model.fit(
+    train_gen,
+    validation_data=val_gen,
+    epochs=15,
+    callbacks=callbacks,
+    verbose=2
+)
+
+print("Stage 1 training complete.")    
